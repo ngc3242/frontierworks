@@ -4,9 +4,10 @@ interface Props {
   title: string;
   badge: string;
   description: string;
+  delay?: number;
 }
 
-const { icon, title, badge, description } = Astro.props;
+const { icon, title, badge, description, delay } = Astro.props;
 
 const icons = {
   education: `<path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" />`,
@@ -15,7 +16,7 @@ const icons = {
 };
 ---
 
-<div class="glass-card reveal-up">
+<div class={`glass-card reveal-up${delay ? ` delay-${delay}` : ''}`}>
     <div class="card-icon">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="url(#blue-gradient)"
             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

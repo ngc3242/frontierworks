@@ -29,17 +29,15 @@ const cards = [
         <p class="section-subtitle">"We make it work"의 의미를 세 가지 핵심 가치로 증명합니다.</p>
     </div>
 
+    <svg width="0" height="0">
+        <linearGradient id="blue-gradient" x1="100%" y1="100%" x2="0%" y2="0%">
+            <stop stop-color="#4facfe" offset="0%" />
+            <stop stop-color="#00f2fe" offset="100%" />
+        </linearGradient>
+    </svg>
     <div class="cards-container">
-        <svg width="0" height="0">
-            <linearGradient id="blue-gradient" x1="100%" y1="100%" x2="0%" y2="0%">
-                <stop stop-color="#4facfe" offset="0%" />
-                <stop stop-color="#00f2fe" offset="100%" />
-            </linearGradient>
-        </svg>
         {cards.map((card, i) => (
-            <div class={`card-wrapper delay-${i + 1}`}>
-                <GlassCard {...card} />
-            </div>
+            <GlassCard {...card} delay={i + 1} />
         ))}
     </div>
 </section>
@@ -71,7 +69,13 @@ const cards = [
 
     .cards-container {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        grid-template-columns: repeat(3, 1fr);
         gap: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .cards-container {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
