@@ -1,0 +1,210 @@
+---
+---
+
+<section class="about" id="about">
+    <div class="about-container reveal-up">
+        <div class="about-content">
+            <h2 class="about-title">"프론티어웍스는 '기술'을 자랑하지 않습니다. <br><span class="highlight">'작동하는 결과물'</span>로 증명합니다."</h2>
+            <p class="about-text">
+                우리는 AI가 단지 트렌드에 머물지 않도록, 교육 현장의 워크플로우 속에
+                자연스럽게 녹아들어 실질적인 변화를 일으키는 도구를 만듭니다.
+            </p>
+            <p class="about-signature">
+                <span class="logo-frontier">Frontier</span><span class="logo-works">Works</span>: We make it work.
+            </p>
+        </div>
+        <div class="about-visual">
+            <div class="tech-circle">
+                <div class="core">AI</div>
+                <div class="orbit">
+                    <div class="node n1"><span>Edu</span></div>
+                    <div class="node n2"><span>Work</span></div>
+                    <div class="node n3"><span>Auto</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    .about {
+        padding: 8rem 2rem;
+        position: relative;
+        z-index: 10;
+        background: linear-gradient(to bottom, transparent, rgba(3, 7, 18, 0.95));
+    }
+
+    .about-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 32px;
+        padding: 4rem;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4rem;
+    }
+
+    .about-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--color-brand-works), transparent);
+    }
+
+    .about-title {
+        font-size: 2.2rem;
+        line-height: 1.4;
+        margin-bottom: 2rem;
+        font-family: var(--font-ko);
+    }
+
+    .about-text {
+        font-size: 1.2rem;
+        color: var(--color-text-secondary);
+        max-width: 700px;
+        margin: 0 auto 3rem;
+        line-height: 1.8;
+    }
+
+    .about-signature {
+        font-family: var(--font-en);
+        font-size: 1.5rem;
+        font-weight: 500;
+        display: inline-block;
+        padding: 1rem 2rem;
+        border: 1px solid var(--color-border);
+        border-radius: 50px;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    /* Tech Circle */
+    .about-visual {
+        width: 300px;
+        height: 300px;
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .tech-circle {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .core {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, var(--color-accent-1), var(--color-accent-2));
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: var(--font-en);
+        font-weight: 700;
+        font-size: 1.5rem;
+        box-shadow: 0 0 30px rgba(79, 172, 254, 0.5);
+        z-index: 2;
+        position: relative;
+    }
+
+    .core::after {
+        content: '';
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        right: -10px;
+        bottom: -10px;
+        border-radius: 50%;
+        border: 1px dashed rgba(79, 172, 254, 0.5);
+        animation: rotate-reverse 10s linear infinite;
+    }
+
+    .orbit {
+        position: absolute;
+        width: 240px;
+        height: 240px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        animation: rotate 15s linear infinite;
+    }
+
+    .node {
+        position: absolute;
+        width: 50px;
+        height: 50px;
+        background: var(--color-surface);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--color-border);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: var(--font-en);
+        font-size: 0.8rem;
+        font-weight: 500;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        top: -25px;
+        left: 50%;
+        transform: translateX(-50%);
+        animation: rotate-reverse 15s linear infinite;
+    }
+
+    .n1 { transform-origin: center 145px; transform: translateX(-50%) rotate(0deg); }
+    .n2 { transform-origin: center 145px; transform: translateX(-50%) rotate(120deg); }
+    .n3 { transform-origin: center 145px; transform: translateX(-50%) rotate(240deg); }
+
+    .n1 > span, .n2 > span, .n3 > span {
+        animation: rotate-reverse 15s linear infinite;
+        display: block;
+    }
+
+    @keyframes rotate {
+        100% { transform: rotate(360deg); }
+    }
+
+    @keyframes rotate-reverse {
+        100% { transform: rotate(-360deg); }
+    }
+
+    @media (max-width: 768px) {
+        .about-container {
+            padding: 3rem 1.5rem;
+        }
+        .about-title {
+            font-size: 1.6rem;
+        }
+    }
+
+    @media (min-width: 900px) {
+        .about-container {
+            flex-direction: row;
+            text-align: left;
+            justify-content: space-between;
+        }
+        .about-container::before {
+            left: 0;
+            transform: none;
+            width: 2px;
+            height: 100%;
+            background: linear-gradient(180deg, transparent, var(--color-brand-works), transparent);
+        }
+        .about-text {
+            margin: 0 0 3rem 0;
+        }
+    }
+</style>

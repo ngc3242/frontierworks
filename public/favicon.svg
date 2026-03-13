@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+    <defs>
+        <linearGradient id="fw-gradient" x1="100%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stop-color="#00f2fe" />
+            <stop offset="100%" stop-color="#4facfe" />
+        </linearGradient>
+        <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#111827" />
+            <stop offset="100%" stop-color="#030712" />
+        </linearGradient>
+    </defs>
+    <!-- Background for visibility in most contexts, rounded square -->
+    <rect width="120" height="120" rx="24" fill="url(#bg-grad)" stroke="rgba(255,255,255,0.05)" stroke-width="2"/>
+    
+    <!-- Abstract Geometry representing F and W -->
+    <g transform="translate(25, 30)">
+        <!-- The 'F' element - stylized -->
+        <path d="M 10,0 L 40,0 L 40,12 L 22,12 L 22,25 L 35,25 L 35,37 L 22,37 L 22,60 L 10,60 Z" fill="url(#fw-gradient)" opacity="0.9" />
+        
+        <!-- The 'W' element - overlapping right -->
+        <path d="M 38,15 L 48,60 L 58,35 L 68,60 L 78,15 L 66,15 L 58,45 L 50,15 Z" fill="#f9fafb" opacity="0.85"/>
+        
+        <!-- Tech dot -->
+        <circle cx="16" cy="7" r="4" fill="#030712"/>
+    </g>
+</svg>

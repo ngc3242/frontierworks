@@ -1,0 +1,123 @@
+---
+---
+
+<div class="gradient-bg">
+    <svg xmlns="http://www.w3.org/2000/svg" class="svg-filter">
+        <defs>
+            <filter id="goo">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" result="goo" />
+                <feBlend in="SourceGraphic" in2="goo" />
+            </filter>
+        </defs>
+    </svg>
+    <div class="gradients-container">
+        <div class="g1"></div>
+        <div class="g2"></div>
+        <div class="g3"></div>
+        <div class="g4"></div>
+        <div class="g5"></div>
+        <div class="interactive"></div>
+    </div>
+</div>
+
+<script>
+    const interactiveNode = document.querySelector<HTMLElement>('.interactive');
+    let curX = 0;
+    let curY = 0;
+    let tgX = 0;
+    let tgY = 0;
+
+    function move() {
+        if (interactiveNode) {
+            curX += (tgX - curX) / 20;
+            curY += (tgY - curY) / 20;
+            interactiveNode.style.transform = `translate(${Math.round(curX)}px, ${Math.round(curY)}px)`;
+            requestAnimationFrame(move);
+        }
+    }
+
+    if (interactiveNode) {
+        window.addEventListener('mousemove', (event) => {
+            tgX = event.clientX;
+            tgY = event.clientY;
+        });
+        move();
+    }
+</script>
+
+<style>
+    .gradient-bg {
+        width: 100vw;
+        height: 100vh;
+        position: fixed;
+        overflow: hidden;
+        background: linear-gradient(40deg, rgb(3, 7, 18), rgb(15, 23, 42));
+        top: 0;
+        left: 0;
+        z-index: -1;
+    }
+
+    .svg-filter {
+        display: none;
+    }
+
+    .gradients-container {
+        filter: url(#goo) blur(40px);
+        width: 100%;
+        height: 100%;
+    }
+
+    .g1, .g2, .g3, .g4, .g5, .interactive {
+        position: absolute;
+        mix-blend-mode: hard-light;
+        width: 80%;
+        height: 80%;
+        opacity: 0.5;
+    }
+
+    .g1 {
+        background: radial-gradient(circle at center, rgba(15, 23, 42, 0.8) 0, rgba(15, 23, 42, 0) 50%) no-repeat;
+        top: calc(50% - 40%);
+        left: calc(50% - 40%);
+        transform-origin: center center;
+        animation: moveVertical 30s ease infinite;
+    }
+
+    .g2 {
+        background: radial-gradient(circle at center, rgba(30, 58, 138, 0.8) 0, rgba(30, 58, 138, 0) 50%) no-repeat;
+        top: calc(50% - 40%);
+        left: calc(50% - 40%);
+        transform-origin: calc(50% - 400px);
+        animation: moveInCircle 20s reverse infinite;
+    }
+
+    .g3 {
+        background: radial-gradient(circle at center, rgba(59, 130, 246, 0.6) 0, rgba(59, 130, 246, 0) 50%) no-repeat;
+        top: calc(50% - 40% + 200px);
+        left: calc(50% - 40% - 500px);
+        transform-origin: calc(50% + 400px);
+        animation: moveInCircle 40s linear infinite;
+    }
+
+    .interactive {
+        background: radial-gradient(circle at center, rgba(140, 100, 255, 0.8) 0, rgba(140, 100, 255, 0) 50%) no-repeat;
+        width: 50%;
+        height: 50%;
+        top: -25%;
+        left: -25%;
+        opacity: 0.3;
+    }
+
+    @keyframes moveInCircle {
+        0% { transform: rotate(0deg); }
+        50% { transform: rotate(180deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    @keyframes moveVertical {
+        0% { transform: translateY(-50%); }
+        50% { transform: translateY(50%); }
+        100% { transform: translateY(-50%); }
+    }
+</style>

@@ -1,0 +1,76 @@
+---
+---
+
+<nav class="navbar">
+    <div class="nav-content">
+        <div class="logo">
+            <span class="logo-frontier">Frontier</span><span class="logo-works">Works</span>
+        </div>
+        <div class="nav-links">
+            <a href="#about">About</a>
+            <a href="#solutions">Solutions</a>
+            <a href="#contact" class="btn-primary">Contact Us</a>
+        </div>
+    </div>
+</nav>
+
+<script>
+    const navbar = document.querySelector('.navbar');
+    window.addEventListener('scroll', () => {
+        if (navbar) {
+            navbar.classList.toggle('scrolled', window.scrollY > 50);
+        }
+    });
+</script>
+
+<style>
+    .navbar {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        padding: 1.5rem 0;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.3s ease;
+    }
+
+    .navbar.scrolled {
+        background: rgba(3, 7, 18, 0.8);
+        padding: 1rem 0;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .nav-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 2rem;
+    }
+
+    .logo {
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
+
+    .nav-links {
+        display: flex;
+        gap: 2rem;
+        align-items: center;
+    }
+
+    .nav-links a {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--color-text-primary);
+        opacity: 0.8;
+        transition: opacity 0.2s;
+    }
+
+    .nav-links a:hover {
+        opacity: 1;
+    }
+</style>

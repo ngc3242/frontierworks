@@ -1,0 +1,111 @@
+:root {
+    --color-bg: #030712;
+    --color-surface: rgba(17, 24, 39, 0.6);
+    --color-surface-hover: rgba(31, 41, 55, 0.8);
+    --color-border: rgba(255, 255, 255, 0.08);
+
+    --color-text-primary: #f9fafb;
+    --color-text-secondary: #9ca3af;
+
+    --color-brand-frontier: #9ca3af;
+    --color-brand-works: #3b82f6;
+    --color-accent-1: #4facfe;
+    --color-accent-2: #00f2fe;
+
+    --font-en: 'Outfit', sans-serif;
+    --font-ko: 'Pretendard', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-ko);
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .logo {
+    font-family: var(--font-en);
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.logo-frontier {
+    color: var(--color-brand-frontier);
+    font-weight: 400;
+}
+
+.logo-works {
+    color: var(--color-brand-works);
+    font-weight: 700;
+}
+
+.highlight {
+    color: var(--color-brand-works);
+}
+
+/* Buttons */
+.btn-primary {
+    background: linear-gradient(135deg, var(--color-accent-1) 0%, var(--color-accent-2) 100%);
+    color: #fff !important;
+    padding: 0.6rem 1.2rem;
+    border-radius: 50px;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff !important;
+    padding: 0.6rem 1.2rem;
+    border-radius: 50px;
+    font-weight: 600;
+    border: 1px solid var(--color-border);
+    backdrop-filter: blur(10px);
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.btn-large {
+    padding: 0.8rem 2rem;
+    font-size: 1.1rem;
+}
+
+/* Animations & Utilities */
+.reveal-up {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.8s cubic-bezier(0.5, 0, 0, 1);
+}
+
+.reveal-up.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.delay-1 { transition-delay: 0.1s; }
+.delay-2 { transition-delay: 0.2s; }
+.delay-3 { transition-delay: 0.3s; }
+.delay-4 { transition-delay: 0.4s; }

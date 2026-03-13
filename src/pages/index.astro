@@ -1,0 +1,40 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import GradientBackground from '../components/GradientBackground.astro';
+import Navbar from '../components/Navbar.astro';
+import Hero from '../components/Hero.astro';
+import Solutions from '../components/Solutions.astro';
+import About from '../components/About.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<BaseLayout>
+    <GradientBackground />
+    <Navbar />
+    <main>
+        <Hero />
+        <Solutions />
+        <About />
+    </main>
+    <Footer />
+</BaseLayout>
+
+<script>
+    const revealElements = document.querySelectorAll('.reveal-up');
+
+    const revealObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('active');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, {
+        threshold: 0.15,
+        rootMargin: '0px 0px -50px 0px',
+    });
+
+    revealElements.forEach(el => {
+        revealObserver.observe(el);
+    });
+</script>
