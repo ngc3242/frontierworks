@@ -9,7 +9,7 @@ export const GET: APIRoute = async ({ request }) => {
   const match = cookieHeader.match(new RegExp(`${cookieName}=([^;]+)`));
   const token = match?.[1];
 
-  const authenticated = validateSession(token);
+  const authenticated = await validateSession(token);
   return new Response(JSON.stringify({ authenticated }), {
     status: authenticated ? 200 : 401,
     headers: { 'Content-Type': 'application/json' },

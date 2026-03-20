@@ -30,7 +30,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const token = createSession();
+    const token = await createSession();
     return new Response(JSON.stringify({ message: 'Login successful' }), {
       status: 200,
       headers: {

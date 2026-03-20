@@ -11,7 +11,7 @@ export const GET: APIRoute = async ({ params, request }) => {
   const match = cookieHeader.match(new RegExp(`${cookieName}=([^;]+)`));
   const token = match?.[1];
 
-  if (!validateSession(token)) {
+  if (!await validateSession(token)) {
     return new Response(JSON.stringify({ message: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },

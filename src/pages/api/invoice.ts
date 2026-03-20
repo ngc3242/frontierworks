@@ -13,7 +13,7 @@ export const POST: APIRoute = async ({ request }) => {
   const match = cookieHeader.match(new RegExp(`${cookieName}=([^;]+)`));
   const token = match?.[1];
 
-  if (!validateSession(token)) {
+  if (!await validateSession(token)) {
     return new Response(JSON.stringify({ message: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },

@@ -3,22 +3,10 @@
 export const prerender = false;
 
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import { validateSession } from '../../lib/auth';
 
 const sessionCookie = Astro.cookies.get('fw_admin_session')?.value;
-let isAuthenticated = false;
-
-if (sessionCookie) {
-  try {
-    const authCheck = await fetch(new URL('/api/auth/check', Astro.url), {
-      headers: { Cookie: `fw_admin_session=${sessionCookie}` },
-    });
-    isAuthenticated = authCheck.ok;
-  } catch {
-    isAuthenticated = false;
-  }
-}
-
-if (!isAuthenticated) {
+if (!await validateSession(sessionCookie)) {
   return Astro.redirect('/admin/login');
 }
 ---
