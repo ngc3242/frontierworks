@@ -1,0 +1,775 @@
+---
+// Invoice history page with server-side auth check
+export const prerender = false;
+
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const sessionCookie = Astro.cookies.get('fw_admin_session')?.value;
+let isAuthenticated = false;
+
+if (sessionCookie) {
+  try {
+    const authCheck = await fetch(new URL('/api/auth/check', Astro.url), {
+      headers: { Cookie: `fw_admin_session=${sessionCookie}` },
+    });
+    isAuthenticated = authCheck.ok;
+  } catch {
+    isAuthenticated = false;
+  }
+}
+
+if (!isAuthenticated) {
+  return Astro.redirect('/admin/login');
+}
+---
+
+<BaseLayout title="발행내역 | FrontierWorks">
+  <nav class="admin-nav">
+    <div class="admin-nav-content">
+      <a href="/admin/invoice" class="admin-logo">
+        <span class="logo-frontier">Frontier</span><span class="logo-works">Works</span>
+        <span class="admin-badge">Admin</span>
+      </a>
+      <div class="admin-nav-right">
+        <a href="/admin/invoice" class="nav-link">세금계산서 발행</a>
+        <button id="logout-btn" class="btn-secondary logout-btn">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="history-main">
+    <div class="page-header">
+      <h1 class="page-title">발행내역</h1>
+      <p class="page-desc">발행된 세금계산서 내역을 조회합니다</p>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <input type="text" id="search-input" class="filter-input" placeholder="상호, 사업자번호로 검색" />
+      <input type="month" id="month-filter" class="filter-input filter-month" />
+      <button id="clear-filter" class="preset-btn">초기화</button>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-cards">
+      <div class="summary-card">
+        <span class="summary-label">총 발행 건수</span>
+        <span id="total-count" class="summary-value">0</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">총 공급가액</span>
+        <span id="total-supply" class="summary-value">0원</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">총 합계금액</span>
+        <span id="total-amount" class="summary-value">0원</span>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>발행일</th>
+            <th>상호</th>
+            <th>사업자번호</th>
+            <th>품목</th>
+            <th class="align-right">공급가액</th>
+            <th class="align-right">세액</th>
+            <th class="align-right">합계</th>
+            <th>상태</th>
+            <th>액션</th>
+          </tr>
+        </thead>
+        <tbody id="history-body">
+        </tbody>
+      </table>
+      <div id="empty-state" class="empty-state" style="display:none;">
+        <p>발행내역이 없습니다.</p>
+      </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-card modal-wide">
+        <div class="modal-header">
+          <h3 class="modal-title">세금계산서 상세</h3>
+          <button id="detail-close" class="modal-x">&times;</button>
+        </div>
+        <div id="detail-content" class="detail-content">
+          <p class="loading-text">불러오는 중...</p>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-amend-cost" class="preset-btn">금액 수정</button>
+          <button id="btn-amend-term" class="preset-btn preset-btn-danger">계약 해제</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Amend Modal -->
+    <div id="amend-modal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="amend-title" class="modal-title">수정발행</h3>
+          <button id="amend-close" class="modal-x">&times;</button>
+        </div>
+        <form id="amend-form" class="amend-form">
+          <input type="hidden" id="amend-key" />
+          <input type="hidden" id="amend-type" />
+          <div class="form-group">
+            <label for="amend-date">수정일자</label>
+            <input type="date" id="amend-date" required />
+          </div>
+          <div id="amend-cost-fields">
+            <div class="form-group">
+              <label for="amend-item-name">품목명</label>
+              <input type="text" id="amend-item-name" placeholder="품목명" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="amend-supply">변동 공급가액</label>
+                <input type="number" id="amend-supply" placeholder="음수 가능" />
+              </div>
+              <div class="form-group">
+                <label for="amend-tax">변동 세액</label>
+                <input type="number" id="amend-tax" placeholder="음수 가능" />
+              </div>
+            </div>
+          </div>
+          <div id="amend-term-info" style="display:none;">
+            <p class="amend-warn">계약 해제 시 원본 세금계산서가 전액 취소됩니다.</p>
+          </div>
+          <button type="submit" class="btn-primary amend-submit">수정발행</button>
+        </form>
+        <div id="amend-result" class="amend-result" style="display:none;"></div>
+      </div>
+    </div>
+  </main>
+</BaseLayout>
+
+<script>
+  interface InvoiceRecord {
+    id: string;
+    issueDate: string;
+    companyName: string;
+    bizNumber: string;
+    itemName: string;
+    supplyAmount: number;
+    taxAmount: number;
+    totalAmount: number;
+    issuedAt: string;
+  }
+
+  function formatNumber(num: number): string {
+    return num.toLocaleString('ko-KR');
+  }
+
+  function loadHistory(): InvoiceRecord[] {
+    try { return JSON.parse(localStorage.getItem('fw_invoice_history') || '[]'); }
+    catch { return []; }
+  }
+
+  const tbody = document.getElementById('history-body') as HTMLTableSectionElement;
+  const emptyState = document.getElementById('empty-state') as HTMLDivElement;
+  const searchInput = document.getElementById('search-input') as HTMLInputElement;
+  const monthFilter = document.getElementById('month-filter') as HTMLInputElement;
+  const totalCountEl = document.getElementById('total-count') as HTMLSpanElement;
+  const totalSupplyEl = document.getElementById('total-supply') as HTMLSpanElement;
+  const totalAmountEl = document.getElementById('total-amount') as HTMLSpanElement;
+
+  function renderHistory(): void {
+    const all = loadHistory();
+    const query = searchInput.value.trim().toLowerCase();
+    const month = monthFilter.value; // YYYY-MM
+
+    const filtered = all.filter(r => {
+      if (query && !r.companyName.toLowerCase().includes(query) && !r.bizNumber.includes(query)) return false;
+      if (month && !r.issueDate.startsWith(month)) return false;
+      return true;
+    });
+
+    tbody.innerHTML = '';
+
+    if (filtered.length === 0) {
+      emptyState.style.display = 'block';
+    } else {
+      emptyState.style.display = 'none';
+    }
+
+    let sumSupply = 0;
+    let sumTotal = 0;
+
+    filtered.forEach(r => {
+      sumSupply += r.supplyAmount;
+      sumTotal += r.totalAmount;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.issueDate}</td>
+        <td>${r.companyName}</td>
+        <td class="mono">${r.bizNumber}</td>
+        <td>${r.itemName || '-'}</td>
+        <td class="align-right">${formatNumber(r.supplyAmount)}</td>
+        <td class="align-right">${formatNumber(r.taxAmount)}</td>
+        <td class="align-right total-cell">${formatNumber(r.totalAmount)}</td>
+        <td><span class="status-badge status-pending" data-key="${r.id}">처리중</span></td>
+        <td><button class="action-btn" data-key="${r.id}">조회</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Fetch webhook statuses
+    fetchStatuses(filtered);
+
+    totalCountEl.textContent = String(filtered.length);
+    totalSupplyEl.textContent = formatNumber(sumSupply) + '원';
+    totalAmountEl.textContent = formatNumber(sumTotal) + '원';
+  }
+
+  renderHistory();
+
+  searchInput.addEventListener('input', renderHistory);
+  monthFilter.addEventListener('change', renderHistory);
+
+  document.getElementById('clear-filter')?.addEventListener('click', () => {
+    searchInput.value = '';
+    monthFilter.value = '';
+    renderHistory();
+  });
+
+  // ── Webhook status fetching ──
+  async function fetchStatuses(records: InvoiceRecord[]): Promise<void> {
+    for (const r of records) {
+      try {
+        const res = await fetch(`/api/webhook/bolta?key=${encodeURIComponent(r.id)}`);
+        const data = await res.json();
+        const badge = document.querySelector(`[data-key="${r.id}"].status-badge`) as HTMLElement;
+        if (!badge) continue;
+        if (data.status === 'success') {
+          badge.textContent = '발행완료';
+          badge.className = 'status-badge status-success';
+        } else if (data.status === 'failure') {
+          badge.textContent = '발행실패';
+          badge.className = 'status-badge status-error';
+        }
+      } catch { /* keep pending */ }
+    }
+  }
+
+  // ── Detail modal ──
+  const detailModal = document.getElementById('detail-modal') as HTMLDivElement;
+  const detailContent = document.getElementById('detail-content') as HTMLDivElement;
+  let currentKey = '';
+
+  function openDetailModal(key: string): void {
+    currentKey = key;
+    detailContent.innerHTML = '<p class="loading-text">불러오는 중...</p>';
+    detailModal.classList.add('visible');
+    detailModal.setAttribute('aria-hidden', 'false');
+
+    fetch(`/api/invoice/${encodeURIComponent(key)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.error || data.message) {
+          detailContent.innerHTML = `<p class="loading-text">${data.message || '발행 처리 중입니다'}</p>`;
+          return;
+        }
+        const inv = data.invoice || {};
+        const sup = inv.supplier || {};
+        const rec = inv.supplied || {};
+        const items = inv.items || [];
+        detailContent.innerHTML = `
+          <div class="detail-grid">
+            <div class="detail-section">
+              <h4>발행 정보</h4>
+              <dl>
+                <dt>발행키</dt><dd class="mono">${data.issuanceKey || key}</dd>
+                <dt>국세청 승인번호</dt><dd class="mono">${data.ntsTransactionId || '-'}</dd>
+                <dt>발행일시</dt><dd>${data.issuedAt ? new Date(data.issuedAt).toLocaleString('ko-KR') : '-'}</dd>
+                <dt>목적</dt><dd>${inv.purpose === 'CLAIM' ? '청구' : '영수'}</dd>
+              </dl>
+            </div>
+            <div class="detail-section">
+              <h4>공급자</h4>
+              <dl>
+                <dt>상호</dt><dd>${sup.organizationName || '-'}</dd>
+                <dt>사업자번호</dt><dd>${sup.identificationNumber || '-'}</dd>
+                <dt>대표자</dt><dd>${sup.representativeName || '-'}</dd>
+              </dl>
+            </div>
+            <div class="detail-section">
+              <h4>공급받는자</h4>
+              <dl>
+                <dt>상호</dt><dd>${rec.organizationName || '-'}</dd>
+                <dt>사업자번호</dt><dd>${rec.identificationNumber || '-'}</dd>
+                <dt>대표자</dt><dd>${rec.representativeName || '-'}</dd>
+              </dl>
+            </div>
+            <div class="detail-section">
+              <h4>품목</h4>
+              ${items.length > 0 ? items.map((it: Record<string, unknown>) => `
+                <dl>
+                  <dt>품목명</dt><dd>${it.name || '-'}</dd>
+                  <dt>공급가액</dt><dd>${formatNumber(Number(it.supplyCost) || 0)}원</dd>
+                  <dt>세액</dt><dd>${it.tax != null ? formatNumber(Number(it.tax)) + '원' : '-'}</dd>
+                </dl>
+              `).join('') : '<p>품목 정보 없음</p>'}
+            </div>
+          </div>
+        `;
+      })
+      .catch(() => {
+        detailContent.innerHTML = '<p class="loading-text">조회에 실패했습니다.</p>';
+      });
+  }
+
+  function closeDetailModal(): void {
+    detailModal.classList.remove('visible');
+    detailModal.setAttribute('aria-hidden', 'true');
+  }
+
+  document.getElementById('detail-close')?.addEventListener('click', closeDetailModal);
+  detailModal.addEventListener('click', (e) => { if (e.target === detailModal) closeDetailModal(); });
+
+  // Action button click delegation
+  tbody.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.action-btn') as HTMLElement;
+    if (btn) openDetailModal(btn.dataset.key || '');
+  });
+
+  // ── Amend modal ──
+  const amendModal = document.getElementById('amend-modal') as HTMLDivElement;
+  const amendForm = document.getElementById('amend-form') as HTMLFormElement;
+  const amendResult = document.getElementById('amend-result') as HTMLDivElement;
+  const amendCostFields = document.getElementById('amend-cost-fields') as HTMLDivElement;
+  const amendTermInfo = document.getElementById('amend-term-info') as HTMLDivElement;
+
+  function openAmendModal(type: 'changeSupplyCost' | 'termination'): void {
+    (document.getElementById('amend-key') as HTMLInputElement).value = currentKey;
+    (document.getElementById('amend-type') as HTMLInputElement).value = type;
+    (document.getElementById('amend-date') as HTMLInputElement).value = new Date().toISOString().split('T')[0];
+    amendResult.style.display = 'none';
+    amendForm.style.display = 'flex';
+
+    if (type === 'changeSupplyCost') {
+      (document.getElementById('amend-title') as HTMLElement).textContent = '금액 수정발행';
+      amendCostFields.style.display = 'block';
+      amendTermInfo.style.display = 'none';
+    } else {
+      (document.getElementById('amend-title') as HTMLElement).textContent = '계약 해제';
+      amendCostFields.style.display = 'none';
+      amendTermInfo.style.display = 'block';
+    }
+
+    closeDetailModal();
+    amendModal.classList.add('visible');
+    amendModal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeAmendModal(): void {
+    amendModal.classList.remove('visible');
+    amendModal.setAttribute('aria-hidden', 'true');
+  }
+
+  document.getElementById('amend-close')?.addEventListener('click', closeAmendModal);
+  amendModal.addEventListener('click', (e) => { if (e.target === amendModal) closeAmendModal(); });
+  document.getElementById('btn-amend-cost')?.addEventListener('click', () => openAmendModal('changeSupplyCost'));
+  document.getElementById('btn-amend-term')?.addEventListener('click', () => openAmendModal('termination'));
+
+  amendForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = (document.getElementById('amend-key') as HTMLInputElement).value;
+    const type = (document.getElementById('amend-type') as HTMLInputElement).value;
+    const date = (document.getElementById('amend-date') as HTMLInputElement).value;
+    const submitBtn = amendForm.querySelector('.amend-submit') as HTMLButtonElement;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '처리 중...';
+
+    const body: Record<string, unknown> = { type, issuanceKey: key, date };
+    if (type === 'changeSupplyCost') {
+      body.items = [{
+        date,
+        name: (document.getElementById('amend-item-name') as HTMLInputElement).value || 'Amendment',
+        supplyCost: Number((document.getElementById('amend-supply') as HTMLInputElement).value) || 0,
+        tax: Number((document.getElementById('amend-tax') as HTMLInputElement).value) || undefined,
+      }];
+    }
+
+    try {
+      const res = await fetch('/api/invoice/amend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      amendForm.style.display = 'none';
+      amendResult.style.display = 'block';
+      if (res.ok) {
+        amendResult.innerHTML = `<p class="amend-success">수정발행 완료<br><span class="mono">${data.issuanceKey || ''}</span></p>`;
+      } else {
+        amendResult.innerHTML = `<p class="amend-error">${data.message || '수정발행 실패'}</p>`;
+      }
+    } catch {
+      amendForm.style.display = 'none';
+      amendResult.style.display = 'block';
+      amendResult.innerHTML = '<p class="amend-error">서버 연결 오류</p>';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '수정발행';
+    }
+  });
+
+  // ── Logout ──
+  document.getElementById('logout-btn')?.addEventListener('click', async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    window.location.href = '/admin/login';
+  });
+</script>
+
+<style>
+  .admin-nav {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    padding: 1rem 0;
+    z-index: 100;
+    background: rgba(3, 7, 18, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .admin-nav-content {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2rem;
+  }
+
+  .admin-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .admin-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--color-accent-1);
+    background: rgba(79, 172, 254, 0.12);
+    border: 1px solid rgba(79, 172, 254, 0.25);
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .admin-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .nav-link {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    transition: color 0.2s;
+  }
+
+  .nav-link:hover {
+    color: var(--color-text-primary);
+  }
+
+  .logout-btn {
+    font-size: 0.85rem;
+    padding: 0.4rem 1rem;
+    font-family: var(--font-ko);
+  }
+
+  .history-main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 4rem;
+  }
+
+  .page-header { margin-bottom: 2rem; }
+
+  .page-title {
+    font-family: var(--font-en);
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .page-desc {
+    font-size: 0.95rem;
+    color: var(--color-text-secondary);
+  }
+
+  /* Filters */
+  .filter-bar {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+  }
+
+  .filter-input {
+    background: rgba(17, 24, 39, 0.8);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    color: var(--color-text-primary);
+    font-size: 0.9rem;
+    font-family: var(--font-ko);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .filter-input:focus { border-color: var(--color-accent-1); }
+  .filter-input::placeholder { color: rgba(156, 163, 175, 0.4); }
+  .filter-input:first-child { flex: 1; }
+  .filter-month { width: 160px; }
+
+  .preset-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.6rem 0.9rem;
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    font-family: var(--font-ko);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .preset-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+  }
+
+  /* Summary */
+  .summary-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .summary-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .summary-label {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+  }
+
+  .summary-value {
+    font-family: var(--font-en);
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+
+  /* Table */
+  .table-wrap {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+  }
+
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .history-table thead {
+    background: rgba(17, 24, 39, 0.6);
+  }
+
+  .history-table th {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  .history-table td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    white-space: nowrap;
+  }
+
+  .history-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .align-right { text-align: right; }
+
+  .mono {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+  }
+
+  .total-cell {
+    font-weight: 600;
+    color: var(--color-accent-2) !important;
+  }
+
+  .id-cell {
+    font-size: 0.7rem;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Status badges */
+  .status-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .status-pending { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+  .status-success { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+  .status-error { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+  .action-btn {
+    background: rgba(79, 172, 254, 0.1);
+    border: 1px solid rgba(79, 172, 254, 0.25);
+    border-radius: 6px;
+    padding: 0.25rem 0.6rem;
+    color: var(--color-accent-1);
+    font-size: 0.75rem;
+    font-family: var(--font-ko);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .action-btn:hover { background: rgba(79, 172, 254, 0.2); }
+
+  /* Modals */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .modal-overlay.visible { opacity: 1; pointer-events: auto; }
+
+  .modal-card {
+    background: rgba(17, 24, 39, 0.95);
+    border: 1px solid var(--color-border);
+    border-radius: 20px; padding: 2rem;
+    max-width: 480px; width: 90%;
+    backdrop-filter: blur(20px);
+    transform: scale(0.95); transition: transform 0.25s;
+  }
+  .modal-overlay.visible .modal-card { transform: scale(1); }
+  .modal-wide { max-width: 640px; }
+
+  .modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  .modal-title { font-family: var(--font-ko); font-size: 1.15rem; font-weight: 600; }
+  .modal-x {
+    background: none; border: none; color: var(--color-text-secondary);
+    font-size: 1.5rem; cursor: pointer; padding: 0; line-height: 1;
+  }
+  .modal-x:hover { color: var(--color-text-primary); }
+
+  .modal-footer {
+    display: flex; gap: 0.75rem; margin-top: 1.5rem;
+    padding-top: 1rem; border-top: 1px solid var(--color-border);
+  }
+  .preset-btn-danger { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
+  .preset-btn-danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+  /* Detail content */
+  .loading-text { color: var(--color-text-secondary); text-align: center; padding: 2rem 0; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .detail-section h4 {
+    font-size: 0.8rem; color: var(--color-accent-1);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 0.75rem;
+  }
+  .detail-section dl { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.75rem; }
+  .detail-section dt { font-size: 0.75rem; color: var(--color-text-secondary); }
+  .detail-section dd { font-size: 0.85rem; margin: 0; }
+
+  /* Amend form */
+  .amend-form {
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .amend-form .form-group {
+    display: flex; flex-direction: column; gap: 0.3rem;
+  }
+  .amend-form label {
+    font-size: 0.8rem; color: var(--color-text-secondary);
+  }
+  .amend-form input {
+    background: rgba(17, 24, 39, 0.8); border: 1px solid var(--color-border);
+    border-radius: 8px; padding: 0.6rem 0.8rem;
+    color: var(--color-text-primary); font-size: 0.9rem;
+    font-family: var(--font-ko); outline: none;
+  }
+  .amend-form input:focus { border-color: var(--color-accent-1); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .amend-warn {
+    color: #ef4444; font-size: 0.85rem;
+    padding: 1rem; background: rgba(239, 68, 68, 0.08);
+    border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+  .amend-submit { width: 100%; margin-top: 0.5rem; font-family: var(--font-ko); }
+  .amend-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .amend-result { text-align: center; padding: 1.5rem 0; }
+  .amend-success { color: #22c55e; font-weight: 600; }
+  .amend-error { color: #ef4444; font-weight: 600; }
+
+  .empty-state {
+    padding: 3rem;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 0.95rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .history-main { padding: 1.5rem 1rem 3rem; }
+    .summary-cards { grid-template-columns: 1fr; }
+    .filter-bar { flex-wrap: wrap; }
+    .filter-input:first-child { min-width: 100%; }
+    .filter-month { flex: 1; }
+    .table-wrap { overflow-x: auto; }
+    .history-table { min-width: 700px; }
+    .admin-nav-content { padding: 0 1rem; }
+    .page-title { font-size: 1.5rem; }
+  }
+</style>

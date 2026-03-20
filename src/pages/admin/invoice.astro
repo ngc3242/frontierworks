@@ -1,0 +1,950 @@
+---
+// Tax invoice form page with server-side auth check
+export const prerender = false;
+
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// Server-side authentication check
+const sessionCookie = Astro.cookies.get('fw_admin_session')?.value;
+let isAuthenticated = false;
+
+if (sessionCookie) {
+  try {
+    const authCheck = await fetch(new URL('/api/auth/check', Astro.url), {
+      headers: { Cookie: `fw_admin_session=${sessionCookie}` },
+    });
+    isAuthenticated = authCheck.ok;
+  } catch {
+    isAuthenticated = false;
+  }
+}
+
+if (!isAuthenticated) {
+  return Astro.redirect('/admin/login');
+}
+---
+
+<BaseLayout title="Invoice | FrontierWorks">
+  <!-- Admin Navigation -->
+  <nav class="admin-nav">
+    <div class="admin-nav-content">
+      <a href="/admin/invoice" class="admin-logo">
+        <span class="logo-frontier">Frontier</span><span class="logo-works">Works</span>
+        <span class="admin-badge">Admin</span>
+      </a>
+      <div class="admin-nav-right">
+        <a href="/admin/history" class="nav-link">발행내역</a>
+        <button id="logout-btn" class="btn-secondary logout-btn">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="invoice-main">
+    <div class="page-header">
+      <h1 class="page-title">Invoice</h1>
+      <p class="page-desc">전자세금계산서를 발행합니다</p>
+    </div>
+
+    <form id="invoice-form" class="invoice-card">
+      <!-- Recipient Info Section -->
+      <section class="form-section">
+        <div class="section-header">
+          <h2 class="section-title">공급받는자 정보</h2>
+          <div class="preset-bar">
+            <select id="recipient-preset" class="preset-select">
+              <option value="">-- 저장된 거래처 --</option>
+            </select>
+            <button type="button" id="save-recipient" class="preset-btn" title="현재 거래처 저장">저장</button>
+            <button type="button" id="delete-recipient" class="preset-btn preset-btn-danger" title="선택된 거래처 삭제">삭제</button>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group span-full">
+            <label for="biz-number">사업자등록번호 <span class="required">*</span></label>
+            <input
+              type="text"
+              id="biz-number"
+              name="bizNumber"
+              placeholder="000-00-00000"
+              maxlength="12"
+              required
+            />
+            <span id="biz-number-error" class="field-error"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="company-name">상호 <span class="required">*</span></label>
+            <input type="text" id="company-name" name="companyName" required />
+          </div>
+
+          <div class="form-group">
+            <label for="ceo-name">대표자명 <span class="required">*</span></label>
+            <input type="text" id="ceo-name" name="ceoName" required />
+          </div>
+
+          <div class="form-group span-full">
+            <label for="address">사업장 주소</label>
+            <input type="text" id="address" name="address" />
+          </div>
+
+          <div class="form-group">
+            <label for="biz-type">업태</label>
+            <input type="text" id="biz-type" name="bizType" />
+          </div>
+
+          <div class="form-group">
+            <label for="biz-category">종목</label>
+            <input type="text" id="biz-category" name="bizCategory" />
+          </div>
+
+          <div class="form-group span-full">
+            <label for="email">이메일 <span class="required">*</span></label>
+            <input type="email" id="email" name="email" placeholder="invoice@example.com" required />
+          </div>
+        </div>
+      </section>
+
+      <!-- Transaction Info Section -->
+      <section class="form-section">
+        <div class="section-header">
+          <h2 class="section-title">거래 정보</h2>
+          <div class="preset-bar">
+            <select id="item-preset" class="preset-select">
+              <option value="">-- 저장된 품목 --</option>
+            </select>
+            <button type="button" id="save-item" class="preset-btn" title="현재 품목 저장">저장</button>
+            <button type="button" id="delete-item" class="preset-btn preset-btn-danger" title="선택된 품목 삭제">삭제</button>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="issue-date">작성일자</label>
+            <input type="date" id="issue-date" name="issueDate" />
+          </div>
+
+          <div class="form-group">
+            <label for="item-name">품목명</label>
+            <input type="text" id="item-name" name="itemName" />
+          </div>
+
+          <div class="form-group">
+            <label for="supply-amount">공급가액 <span class="required">*</span></label>
+            <input
+              type="text"
+              id="supply-amount"
+              name="supplyAmount"
+              inputmode="numeric"
+              placeholder="0"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="tax-amount">세액 (10%)</label>
+            <input
+              type="text"
+              id="tax-amount"
+              name="taxAmount"
+              inputmode="numeric"
+              placeholder="0"
+            />
+          </div>
+
+          <div class="form-group span-full">
+            <label for="total-amount">합계금액</label>
+            <input
+              type="text"
+              id="total-amount"
+              name="totalAmount"
+              readonly
+              placeholder="0"
+              class="readonly-input"
+            />
+          </div>
+
+          <div class="form-group span-full">
+            <label for="notes">비고</label>
+            <textarea id="notes" name="notes" rows="3" placeholder="비고 사항을 입력하세요"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-primary btn-large submit-btn">
+          세금계산서 발행
+        </button>
+      </div>
+    </form>
+
+    <!-- Result Modal -->
+    <div id="result-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="modal-card">
+        <div id="modal-icon" class="modal-icon"></div>
+        <h3 id="modal-title" class="modal-title"></h3>
+        <p id="modal-message" class="modal-message"></p>
+        <button id="modal-close" class="btn-primary modal-close-btn">OK</button>
+      </div>
+    </div>
+  </main>
+</BaseLayout>
+
+<script>
+  // ── Utility functions ──
+
+  /** Format number with commas */
+  function formatNumber(num: number): string {
+    return num.toLocaleString('ko-KR');
+  }
+
+  /** Parse number from comma-formatted string */
+  function parseNumber(str: string): number {
+    return parseInt(str.replace(/[^\d]/g, ''), 10) || 0;
+  }
+
+  /** Format business registration number as XXX-XX-XXXXX */
+  function formatBizNumber(value: string): string {
+    const digits = value.replace(/\D/g, '').slice(0, 10);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+  }
+
+  /** Validate business registration number pattern */
+  function isValidBizNumber(value: string): boolean {
+    return /^\d{3}-\d{2}-\d{5}$/.test(value);
+  }
+
+  // ── DOM references ──
+  const form = document.getElementById('invoice-form') as HTMLFormElement;
+  const bizNumberInput = document.getElementById('biz-number') as HTMLInputElement;
+  const bizNumberError = document.getElementById('biz-number-error') as HTMLSpanElement;
+  const supplyInput = document.getElementById('supply-amount') as HTMLInputElement;
+  const taxInput = document.getElementById('tax-amount') as HTMLInputElement;
+  const totalInput = document.getElementById('total-amount') as HTMLInputElement;
+  const issueDateInput = document.getElementById('issue-date') as HTMLInputElement;
+  const submitBtn = form.querySelector('.submit-btn') as HTMLButtonElement;
+
+  // Modal references
+  const modal = document.getElementById('result-modal') as HTMLDivElement;
+  const modalIcon = document.getElementById('modal-icon') as HTMLDivElement;
+  const modalTitle = document.getElementById('modal-title') as HTMLHeadingElement;
+  const modalMessage = document.getElementById('modal-message') as HTMLParagraphElement;
+  const modalCloseBtn = document.getElementById('modal-close') as HTMLButtonElement;
+
+  // ── Set default date to today ──
+  const today = new Date().toISOString().split('T')[0];
+  issueDateInput.value = today;
+
+  // ── Business number formatting ──
+  bizNumberInput.addEventListener('input', () => {
+    const pos = bizNumberInput.selectionStart || 0;
+    const prevLen = bizNumberInput.value.length;
+    bizNumberInput.value = formatBizNumber(bizNumberInput.value);
+    const newLen = bizNumberInput.value.length;
+    bizNumberInput.setSelectionRange(pos + (newLen - prevLen), pos + (newLen - prevLen));
+
+    if (bizNumberInput.value.length === 12) {
+      if (isValidBizNumber(bizNumberInput.value)) {
+        bizNumberInput.classList.remove('input-error');
+        bizNumberInput.classList.add('input-valid');
+        bizNumberError.textContent = '';
+      } else {
+        bizNumberInput.classList.add('input-error');
+        bizNumberInput.classList.remove('input-valid');
+        bizNumberError.textContent = '올바른 형식이 아닙니다 (XXX-XX-XXXXX)';
+      }
+    } else {
+      bizNumberInput.classList.remove('input-error', 'input-valid');
+      bizNumberError.textContent = '';
+    }
+  });
+
+  // ── Amount formatting and auto-calculation ──
+  function handleAmountInput(input: HTMLInputElement) {
+    const num = parseNumber(input.value);
+    input.value = num > 0 ? formatNumber(num) : '';
+  }
+
+  function recalculate() {
+    const supply = parseNumber(supplyInput.value);
+    const tax = Math.round(supply * 0.1);
+    taxInput.value = tax > 0 ? formatNumber(tax) : '';
+    const total = supply + parseNumber(taxInput.value);
+    totalInput.value = total > 0 ? formatNumber(total) : '';
+  }
+
+  supplyInput.addEventListener('input', () => {
+    handleAmountInput(supplyInput);
+    recalculate();
+  });
+
+  taxInput.addEventListener('input', () => {
+    handleAmountInput(taxInput);
+    // Recalculate total only (tax is user-edited)
+    const supply = parseNumber(supplyInput.value);
+    const tax = parseNumber(taxInput.value);
+    const total = supply + tax;
+    totalInput.value = total > 0 ? formatNumber(total) : '';
+  });
+
+  // ── Modal controls ──
+  function showModal(type: 'success' | 'error', title: string, message: string) {
+    modalIcon.innerHTML = type === 'success'
+      ? '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+      : '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+    modal.classList.add('visible');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function hideModal() {
+    modal.classList.remove('visible');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  modalCloseBtn.addEventListener('click', hideModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) hideModal();
+  });
+
+  // ── Form submission ──
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Validate business number
+    if (!isValidBizNumber(bizNumberInput.value)) {
+      bizNumberInput.classList.add('input-error');
+      bizNumberError.textContent = '올바른 사업자등록번호를 입력해주세요';
+      bizNumberInput.focus();
+      return;
+    }
+
+    // Validate required fields
+    const companyName = (document.getElementById('company-name') as HTMLInputElement).value.trim();
+    const ceoName = (document.getElementById('ceo-name') as HTMLInputElement).value.trim();
+    const email = (document.getElementById('email') as HTMLInputElement).value.trim();
+    const supplyAmount = parseNumber(supplyInput.value);
+
+    if (!companyName || !ceoName || !email || supplyAmount <= 0) {
+      showModal('error', '입력 오류', '필수 항목을 모두 입력해주세요.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '발행 중...';
+
+    const payload = {
+      bizNumber: bizNumberInput.value,
+      companyName,
+      ceoName,
+      address: (document.getElementById('address') as HTMLInputElement).value.trim(),
+      bizType: (document.getElementById('biz-type') as HTMLInputElement).value.trim(),
+      bizCategory: (document.getElementById('biz-category') as HTMLInputElement).value.trim(),
+      email,
+      issueDate: issueDateInput.value,
+      itemName: (document.getElementById('item-name') as HTMLInputElement).value.trim(),
+      supplyAmount,
+      taxAmount: parseNumber(taxInput.value),
+      totalAmount: parseNumber(totalInput.value),
+      notes: (document.getElementById('notes') as HTMLTextAreaElement).value.trim(),
+    };
+
+    try {
+      const res = await fetch('/api/invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const resData = await res.json().catch(() => ({}));
+        // Save to history
+        const history = JSON.parse(localStorage.getItem('fw_invoice_history') || '[]');
+        history.unshift({
+          id: resData.invoiceId || `INV-${Date.now()}`,
+          ...payload,
+          issuedAt: new Date().toISOString(),
+        });
+        localStorage.setItem('fw_invoice_history', JSON.stringify(history));
+        showModal('success', '발행 완료', '세금계산서가 성공적으로 발행되었습니다.');
+        form.reset();
+        issueDateInput.value = today;
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showModal('error', '발행 실패', data.message || '세금계산서 발행에 실패했습니다. 다시 시도해주세요.');
+      }
+    } catch {
+      showModal('error', '연결 오류', '서버에 연결할 수 없습니다. 다시 시도해주세요.');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '세금계산서 발행';
+    }
+  });
+
+  // ── Preset management (localStorage) ──
+  const RECIPIENT_KEY = 'fw_recipient_presets';
+  const ITEM_KEY = 'fw_item_presets';
+
+  // Seed default presets on first visit
+  if (!localStorage.getItem(RECIPIENT_KEY)) {
+    localStorage.setItem(RECIPIENT_KEY, JSON.stringify([
+      {
+        name: '스콜라영어',
+        bizNumber: '270-99-00923',
+        companyName: '스콜라영어',
+        ceoName: '이영수',
+        address: '',
+        bizType: '',
+        bizCategory: '',
+        email: 'patrickulee@gmail.com',
+      },
+    ]));
+  }
+  if (!localStorage.getItem(ITEM_KEY)) {
+    localStorage.setItem(ITEM_KEY, JSON.stringify([
+      { name: 'SARA 사용료', itemName: 'SARA 사용료', supplyAmount: 1200000 },
+    ]));
+  }
+
+  interface RecipientPreset {
+    name: string;
+    bizNumber: string;
+    companyName: string;
+    ceoName: string;
+    address: string;
+    bizType: string;
+    bizCategory: string;
+    email: string;
+  }
+
+  interface ItemPreset {
+    name: string;
+    itemName: string;
+    supplyAmount: number;
+  }
+
+  function loadPresets<T>(key: string): T[] {
+    try { return JSON.parse(localStorage.getItem(key) || '[]'); }
+    catch { return []; }
+  }
+
+  function savePresets<T>(key: string, data: T[]): void {
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+
+  // Recipient presets
+  const recipientSelect = document.getElementById('recipient-preset') as HTMLSelectElement;
+
+  function refreshRecipientOptions(): void {
+    const presets = loadPresets<RecipientPreset>(RECIPIENT_KEY);
+    recipientSelect.innerHTML = '<option value="">-- 저장된 거래처 --</option>';
+    presets.forEach((p, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = `${p.companyName} (${p.bizNumber})`;
+      recipientSelect.appendChild(opt);
+    });
+  }
+
+  refreshRecipientOptions();
+
+  recipientSelect.addEventListener('change', () => {
+    const idx = recipientSelect.value;
+    if (idx === '') return;
+    const presets = loadPresets<RecipientPreset>(RECIPIENT_KEY);
+    const p = presets[Number(idx)];
+    if (!p) return;
+    bizNumberInput.value = p.bizNumber;
+    (document.getElementById('company-name') as HTMLInputElement).value = p.companyName;
+    (document.getElementById('ceo-name') as HTMLInputElement).value = p.ceoName;
+    (document.getElementById('address') as HTMLInputElement).value = p.address;
+    (document.getElementById('biz-type') as HTMLInputElement).value = p.bizType;
+    (document.getElementById('biz-category') as HTMLInputElement).value = p.bizCategory;
+    (document.getElementById('email') as HTMLInputElement).value = p.email;
+  });
+
+  document.getElementById('save-recipient')?.addEventListener('click', () => {
+    const companyName = (document.getElementById('company-name') as HTMLInputElement).value.trim();
+    if (!companyName) { showModal('error', '저장 실패', '상호를 입력해주세요.'); return; }
+    const presets = loadPresets<RecipientPreset>(RECIPIENT_KEY);
+    const newPreset: RecipientPreset = {
+      name: companyName,
+      bizNumber: bizNumberInput.value,
+      companyName,
+      ceoName: (document.getElementById('ceo-name') as HTMLInputElement).value.trim(),
+      address: (document.getElementById('address') as HTMLInputElement).value.trim(),
+      bizType: (document.getElementById('biz-type') as HTMLInputElement).value.trim(),
+      bizCategory: (document.getElementById('biz-category') as HTMLInputElement).value.trim(),
+      email: (document.getElementById('email') as HTMLInputElement).value.trim(),
+    };
+    // Update if same company name exists
+    const existingIdx = presets.findIndex(p => p.companyName === companyName);
+    if (existingIdx >= 0) { presets[existingIdx] = newPreset; }
+    else { presets.push(newPreset); }
+    savePresets(RECIPIENT_KEY, presets);
+    refreshRecipientOptions();
+    showModal('success', '저장 완료', `"${companyName}" 거래처가 저장되었습니다.`);
+  });
+
+  document.getElementById('delete-recipient')?.addEventListener('click', () => {
+    const idx = recipientSelect.value;
+    if (idx === '') { showModal('error', '삭제 실패', '삭제할 거래처를 선택해주세요.'); return; }
+    const presets = loadPresets<RecipientPreset>(RECIPIENT_KEY);
+    const name = presets[Number(idx)]?.companyName;
+    presets.splice(Number(idx), 1);
+    savePresets(RECIPIENT_KEY, presets);
+    refreshRecipientOptions();
+    showModal('success', '삭제 완료', `"${name}" 거래처가 삭제되었습니다.`);
+  });
+
+  // Item presets
+  const itemSelect = document.getElementById('item-preset') as HTMLSelectElement;
+
+  function refreshItemOptions(): void {
+    const presets = loadPresets<ItemPreset>(ITEM_KEY);
+    itemSelect.innerHTML = '<option value="">-- 저장된 품목 --</option>';
+    presets.forEach((p, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = `${p.itemName} (${formatNumber(p.supplyAmount)}원)`;
+      itemSelect.appendChild(opt);
+    });
+  }
+
+  refreshItemOptions();
+
+  itemSelect.addEventListener('change', () => {
+    const idx = itemSelect.value;
+    if (idx === '') return;
+    const presets = loadPresets<ItemPreset>(ITEM_KEY);
+    const p = presets[Number(idx)];
+    if (!p) return;
+    (document.getElementById('item-name') as HTMLInputElement).value = p.itemName;
+    supplyInput.value = formatNumber(p.supplyAmount);
+    recalculate();
+  });
+
+  document.getElementById('save-item')?.addEventListener('click', () => {
+    const itemName = (document.getElementById('item-name') as HTMLInputElement).value.trim();
+    const supplyAmount = parseNumber(supplyInput.value);
+    if (!itemName) { showModal('error', '저장 실패', '품목명을 입력해주세요.'); return; }
+    if (supplyAmount <= 0) { showModal('error', '저장 실패', '공급가액을 입력해주세요.'); return; }
+    const presets = loadPresets<ItemPreset>(ITEM_KEY);
+    const newPreset: ItemPreset = { name: itemName, itemName, supplyAmount };
+    const existingIdx = presets.findIndex(p => p.itemName === itemName);
+    if (existingIdx >= 0) { presets[existingIdx] = newPreset; }
+    else { presets.push(newPreset); }
+    savePresets(ITEM_KEY, presets);
+    refreshItemOptions();
+    showModal('success', '저장 완료', `"${itemName}" 품목이 저장되었습니다.`);
+  });
+
+  document.getElementById('delete-item')?.addEventListener('click', () => {
+    const idx = itemSelect.value;
+    if (idx === '') { showModal('error', '삭제 실패', '삭제할 품목을 선택해주세요.'); return; }
+    const presets = loadPresets<ItemPreset>(ITEM_KEY);
+    const name = presets[Number(idx)]?.itemName;
+    presets.splice(Number(idx), 1);
+    savePresets(ITEM_KEY, presets);
+    refreshItemOptions();
+    showModal('success', '삭제 완료', `"${name}" 품목이 삭제되었습니다.`);
+  });
+
+  // ── Logout ──
+  document.getElementById('logout-btn')?.addEventListener('click', async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Continue to redirect even if logout API fails
+    }
+    window.location.href = '/admin/login';
+  });
+</script>
+
+<style>
+  /* ── Admin Navigation ── */
+  .admin-nav {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    padding: 1rem 0;
+    z-index: 100;
+    background: rgba(3, 7, 18, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .admin-nav-content {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2rem;
+  }
+
+  .admin-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .admin-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--color-accent-1);
+    background: rgba(79, 172, 254, 0.12);
+    border: 1px solid rgba(79, 172, 254, 0.25);
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .admin-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .nav-link {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    transition: color 0.2s;
+  }
+
+  .nav-link:hover {
+    color: var(--color-text-primary);
+  }
+
+  .logout-btn {
+    font-size: 0.85rem;
+    padding: 0.4rem 1rem;
+    font-family: var(--font-ko);
+  }
+
+  /* ── Main content ── */
+  .invoice-main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 4rem;
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+  }
+
+  .page-title {
+    font-family: var(--font-en);
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .page-desc {
+    font-size: 0.95rem;
+    color: var(--color-text-secondary);
+  }
+
+  /* ── Invoice Card ── */
+  .invoice-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 24px;
+    padding: 2.5rem;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* ── Sections ── */
+  .form-section {
+    margin-bottom: 2.5rem;
+  }
+
+  .form-section:last-of-type {
+    margin-bottom: 2rem;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .section-header .section-title {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .section-title {
+    font-family: var(--font-ko);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .preset-bar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .preset-select {
+    background: rgba(17, 24, 39, 0.8);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    color: var(--color-text-primary);
+    font-size: 0.8rem;
+    font-family: var(--font-ko);
+    outline: none;
+    min-width: 180px;
+  }
+
+  .preset-select:focus {
+    border-color: var(--color-accent-1);
+  }
+
+  .preset-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.4rem 0.7rem;
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    font-family: var(--font-ko);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .preset-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+  }
+
+  .preset-btn-danger:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+
+  /* ── Form Grid ── */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+
+  .span-full {
+    grid-column: 1 / -1;
+  }
+
+  /* ── Form Groups ── */
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .form-group label {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .required {
+    color: #ef4444;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    background: rgba(17, 24, 39, 0.8);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    color: var(--color-text-primary);
+    font-size: 0.95rem;
+    font-family: var(--font-ko);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus,
+  .form-group textarea:focus {
+    border-color: var(--color-accent-1);
+  }
+
+  .form-group input::placeholder,
+  .form-group textarea::placeholder {
+    color: rgba(156, 163, 175, 0.4);
+  }
+
+  .form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  .readonly-input {
+    background: rgba(17, 24, 39, 0.4) !important;
+    color: var(--color-accent-2) !important;
+    font-weight: 600;
+    cursor: default;
+  }
+
+  /* ── Validation states ── */
+  .input-error {
+    border-color: #ef4444 !important;
+  }
+
+  .input-valid {
+    border-color: #22c55e !important;
+  }
+
+  .field-error {
+    font-size: 0.75rem;
+    color: #ef4444;
+    min-height: 1rem;
+  }
+
+  /* ── Form Actions ── */
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .submit-btn {
+    min-width: 200px;
+    font-family: var(--font-ko);
+    font-size: 1rem;
+  }
+
+  .submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+
+  .modal-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .modal-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transform: scale(0.95);
+    transition: transform 0.25s;
+  }
+
+  .modal-overlay.visible .modal-card {
+    transform: scale(1);
+  }
+
+  .modal-icon {
+    margin-bottom: 1rem;
+  }
+
+  .modal-title {
+    font-family: var(--font-en);
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .modal-message {
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+  }
+
+  .modal-close-btn {
+    min-width: 120px;
+    font-family: var(--font-ko);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .invoice-main {
+      padding: 1.5rem 1rem 3rem;
+    }
+
+    .invoice-card {
+      padding: 1.5rem;
+      border-radius: 16px;
+    }
+
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .span-full {
+      grid-column: auto;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .form-actions {
+      justify-content: stretch;
+    }
+
+    .submit-btn {
+      width: 100%;
+    }
+
+    .admin-nav-content {
+      padding: 0 1rem;
+    }
+
+    .section-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .preset-bar {
+      width: 100%;
+    }
+
+    .preset-select {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+</style>

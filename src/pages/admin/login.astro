@@ -1,0 +1,200 @@
+---
+// Admin login page - password only (single admin, no username)
+export const prerender = false;
+
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Admin Login | FrontierWorks">
+  <div class="login-container">
+    <div class="login-card">
+      <div class="logo">
+        <span class="logo-frontier">Frontier</span><span class="logo-works">Works</span>
+      </div>
+      <h1 class="login-title">관리자</h1>
+      <p class="login-subtitle">관리자 전용 페이지입니다</p>
+
+      <form id="login-form" class="login-form">
+        <div class="form-group">
+          <label for="password">비밀번호</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="관리자 비밀번호를 입력하세요"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+        <div id="error-message" class="error-message" role="alert"></div>
+        <button type="submit" class="btn-primary btn-large login-btn">
+          로그인
+        </button>
+      </form>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  const form = document.getElementById('login-form') as HTMLFormElement;
+  const errorMessage = document.getElementById('error-message') as HTMLDivElement;
+  const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorMessage.textContent = '';
+    errorMessage.classList.remove('visible');
+
+    const password = (document.getElementById('password') as HTMLInputElement).value;
+
+    if (!password) {
+      errorMessage.textContent = '비밀번호를 입력해주세요.';
+      errorMessage.classList.add('visible');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '로그인 중...';
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      if (res.ok) {
+        window.location.href = '/admin/invoice';
+      } else {
+        const data = await res.json().catch(() => ({}));
+        errorMessage.textContent = data.message || '비밀번호가 올바르지 않습니다.';
+        errorMessage.classList.add('visible');
+      }
+    } catch {
+      errorMessage.textContent = '서버 연결 오류가 발생했습니다.';
+      errorMessage.classList.add('visible');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '로그인';
+    }
+  });
+</script>
+
+<style>
+  .login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 24px;
+    padding: 3rem 2.5rem;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    text-align: center;
+  }
+
+  .logo {
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 1.5rem;
+  }
+
+  .login-title {
+    font-family: var(--font-en);
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--color-text-secondary);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+  }
+
+  .login-subtitle {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    opacity: 0.6;
+    margin-bottom: 2.5rem;
+  }
+
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: left;
+  }
+
+  .form-group label {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .form-group input {
+    background: rgba(17, 24, 39, 0.8);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    color: var(--color-text-primary);
+    font-size: 1rem;
+    font-family: var(--font-ko);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus {
+    border-color: var(--color-accent-1);
+  }
+
+  .form-group input::placeholder {
+    color: rgba(156, 163, 175, 0.5);
+  }
+
+  .error-message {
+    font-size: 0.85rem;
+    color: #ef4444;
+    min-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .error-message.visible {
+    opacity: 1;
+  }
+
+  .login-btn {
+    width: 100%;
+    font-size: 1rem;
+    font-family: var(--font-ko);
+    margin-top: 0.5rem;
+  }
+
+  .login-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  @media (max-width: 480px) {
+    .login-card {
+      padding: 2rem 1.5rem;
+      border-radius: 16px;
+    }
+  }
+</style>
